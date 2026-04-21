@@ -1,0 +1,59 @@
+---
+description: Regras para src/settings.py — config centralizada e factories
+globs: src/settings.py
+alwaysApply: false
+---
+
+# src/settings.py — Regras
+
+Este arquivo é a **única fonte de verdade** para configuração e criação de clientes. Mudanças aqui impactam todo o pipeline.
+
+## Responsabilidades
+
+1. Carregar `.env` via `load_dotenv()` — chamar uma única vez no topo.
+2. Validar envs com `_require_env(name)` — lança `RuntimeError` em pt-BR se ausente/vazio.
+3. Expor factories: `get_embeddings()`, `get_llm()`, `build_vector_store()`.
+4. Expor constantes: `CHUNK_SIZE=1000`, `CHUNK_OVERLAP=150`, `TOP_K=10`.
+
+## Não faça
+
+- ❌ Importar de `ingest.py`, `search.py` ou `chat.py` (acoplamento invertido).
+- ❌ Criar instâncias em nível de módulo (só em funções factory).
+- ❌ Silenciar env ausente com defaults que mascarem erro (`os.getenv("X", "")` sem validar).
+- ❌ Logar `DATABASE_URL` ou API keys em caso de erro.
+
+## Faça
+
+- ✅ Validação específica por provider: `validate_provider_credentials(provider)` valida só a chave do provider ativo.
+- ✅ Modelos hard-coded: `gpt-5-nano` e `gemini-2.5-flash-lite` (fixados pelo enunciado).
+- ✅ `temperature=0` em ambos os LLMs.
+- ✅ `PGVector(..., use_jsonb=True)` sempre.
+- ✅ Type hints com tipos de `langchain_core` (`Embeddings`, `BaseChatModel`).
+
+## Padrão de validação
+
+```python
+def _require_env(name: str) -> str:
+    value = os.getenv(name)
+    if value is None or not str(value).strip():
+        raise RuntimeError(
+            f"Variável de ambiente obrigatória ausente ou vazia: {name}. "
+            "Copie .env.example para .env e preencha os valores."
+        )
+    return str(value).strip()
+```
+
+## Assinatura das factories
+
+```python
+def get_embeddings() -> Embeddings: ...
+def get_llm() -> BaseChatModel: ...
+def build_vector_store() -> PGVector: ...
+def get_provider() -> ProviderLiteral: ...  # Literal["openai", "gemini"]
+```
+
+Antes de editar, valide o estado atual:
+
+```powershell
+python .cursor/skills/ingestao-busca-rag-dev/scripts/check_env.py
+```

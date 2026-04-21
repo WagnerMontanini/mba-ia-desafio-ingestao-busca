@@ -1,0 +1,105 @@
+---
+description: Regras de infraestrutura — .env, docker-compose, Makefile
+globs: .env*,docker-compose.yml,Makefile,README.md
+alwaysApply: false
+---
+
+# Infra e Configuração
+
+## `.env` / `.env.example`
+
+- **Nunca** commitar `.env` (já no `.gitignore`). Apenas `.env.example`.
+- `.env.example` é documentação viva — mantenha sincronizado com envs exigidas por `settings.py`.
+- Envs obrigatórias: `PROVIDER`, `DATABASE_URL`, `PG_VECTOR_COLLECTION_NAME`, `PDF_PATH`, + chave do provider.
+- `DATABASE_URL` **deve** começar com `postgresql+psycopg://` (psycopg3).
+
+Exemplo canônico:
+
+```dotenv
+PROVIDER=openai
+OPENAI_API_KEY=
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+GOOGLE_API_KEY=
+GOOGLE_EMBEDDING_MODEL=gemini-embedding-2-preview
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/rag
+PG_VECTOR_COLLECTION_NAME=documents
+PDF_PATH=./document.pdf
+```
+
+## `docker-compose.yml`
+
+- Imagem fixa: `pgvector/pgvector:pg17`.
+- Serviço `postgres` com healthcheck `pg_isready`.
+- Serviço `bootstrap_vector_ext` cria `CREATE EXTENSION IF NOT EXISTS vector;` — não remover.
+- Porta padrão `5432:5432`. Volume nomeado `postgres_data`.
+- Não adicionar app web/backend aqui — o CLI roda no host.
+
+## Ambiente virtual (`.venv`) — obrigatório
+
+- **Toda** instalação de dependência deve ocorrer dentro de um `.venv` local do projeto. Nunca no Python global.
+- Nome padronizado: `.venv` (não `venv`, não `env`). Já listado no `.gitignore`.
+- Antes de rodar `make install`, `python src/ingest.py`, `python src/chat.py`: ative o venv.
+
+```powershell
+# Criação única
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+
+# Toda vez que abrir um novo terminal
+.\.venv\Scripts\Activate.ps1
+```
+
+Confirme antes de instalar:
+
+```powershell
+python -c "import sys; print(sys.executable)"
+# Deve imprimir ...\mba-ia-desafio-ingestao-busca\.venv\Scripts\python.exe
+```
+
+## `Makefile`
+
+O target `install` **deve** rejeitar instalação fora do venv. Versão canônica:
+
+```makefile
+.PHONY: install venv up down logs ingest chat check verify reset clean
+
+venv:
+	python -m venv .venv
+	@echo "Ative com:  .\\.venv\\Scripts\\Activate.ps1  (Windows)  ou  source .venv/bin/activate  (Unix)"
+
+install:
+	@python -c "import sys, os; sys.exit(0 if os.path.realpath(sys.prefix) != os.path.realpath(sys.base_prefix) else 1)" \
+		|| (echo "ERRO: nenhum .venv ativo. Rode 'make venv' e ative antes de 'make install'." && exit 1)
+	python -m pip install --upgrade pip
+	pip install -r requirements.txt
+
+up:      ; docker compose up -d
+down:    ; docker compose down
+logs:    ; docker compose logs -f postgres
+ingest:  ; python src/ingest.py
+chat:    ; python src/chat.py
+check:   ; python .cursor/skills/ingestao-busca-rag-dev/scripts/check_env.py
+verify:  ; python .cursor/skills/ingestao-busca-rag-dev/scripts/verify_db.py
+reset:   ; python .cursor/skills/ingestao-busca-rag-dev/scripts/reset_collection.py
+clean:   ; docker compose down -v
+```
+
+Windows não tem `make` nativo — documente `choco install make` no README ou forneça alternativa PowerShell equivalente.
+
+## `README.md`
+
+Seções obrigatórias (nesta ordem): Pré-requisitos → Setup → Providers → Execução → Troubleshooting → Estrutura.
+
+Troubleshooting deve cobrir:
+1. `"different vector dimensions"` → troca de provider sem reset.
+2. `"connection refused"` → Docker não subiu.
+3. `"extension vector does not exist"` → bootstrap falhou.
+4. `RuntimeError: Variável de ambiente obrigatória` → env incompleto.
+
+## Anti-padrões
+
+- ❌ Comitar `document.pdf` com dados sensíveis.
+- ❌ `DATABASE_URL` com `postgresql://` (sem `+psycopg`).
+- ❌ Variáveis de ambiente com aspas no `.env` quando não necessário (`PDF_PATH="./doc.pdf"` pode quebrar parsing).
+- ❌ Hardcode de `localhost` em lugar de env — sempre via `DATABASE_URL`.

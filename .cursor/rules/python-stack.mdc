@@ -1,0 +1,83 @@
+---
+description: Convenções de código Python para este projeto (não-Django)
+globs: **/*.py
+alwaysApply: false
+---
+
+# Convenções Python — Projeto RAG CLI
+
+> Este projeto **não é Django**. Ignore: `gettext`, CBVs/FBVs, ORM, Admin, migrations.
+
+## Estilo
+
+- **PEP 8**, linha ≤ 100 colunas, Black/isort compatível.
+- `from __future__ import annotations` no topo de módulos com type hints.
+- Imports em 3 blocos: stdlib → terceiros → locais, alfabetizados.
+
+## Tipagem e docstrings
+
+- **Type hints obrigatórios** em funções públicas.
+- Retornos explícitos, sem `Any`. Use `Embeddings`, `BaseChatModel`, `Document` do `langchain_core.*`.
+- Docstrings estilo Google curto em funções públicas.
+
+## Logging
+
+- `logger = logging.getLogger(__name__)` por módulo.
+- Em scripts executáveis: `logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), ...)`.
+- **Nunca** `print()` em código de biblioteca (`settings.py`, `ingest.py`, `search.py`).
+- `print()` só em `chat.py` (UX do REPL).
+- Jamais logue `DATABASE_URL` com senha, API keys, ou trechos integrais do PDF.
+
+```python
+# ✅ GOOD
+logger.info("Ingestão concluída: %d chunks persistidos.", len(chunks))
+
+# ❌ BAD
+print(f"concluído: {len(chunks)}")
+```
+
+## Erros
+
+- **Fail-fast** em config: `RuntimeError` com mensagem acionável em pt-BR.
+- `try/except Exception` apenas no loop do REPL, sempre com `logger.exception()`.
+- Use exceções específicas: `FileNotFoundError`, `ValueError`, `RuntimeError`.
+
+## Estrutura de imports do src/
+
+- `settings.py` não importa de `ingest/search/chat`.
+- `chat.py` importa apenas de `search.py` + stdlib.
+- Sem importação cruzada entre `ingest.py` e `search.py`.
+- Não adicione `sys.path.insert` manualmente — rode scripts com `python src/xxx.py`.
+
+## Dependências
+
+- **Instalar SEMPRE em `.venv` local** — jamais no Python global.
+- Pin exato em `requirements.txt`. Não faça upgrade sem justificativa + teste e2e.
+- Jamais `pip install` em runtime. Adicionar lib nova = incluir no requirements + PR.
+
+### Criar e usar o `.venv`
+
+```powershell
+# Windows PowerShell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+```bash
+# Linux / macOS
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Antes de qualquer `pip install` ou `python src/...`, confirme o venv ativo:
+
+```powershell
+# Deve apontar para <repo>\.venv\Scripts\python.exe
+python -c "import sys; print(sys.executable)"
+```
+
+Se o caminho **não** contém `.venv`, ative antes. O diretório `.venv/` está no `.gitignore`.

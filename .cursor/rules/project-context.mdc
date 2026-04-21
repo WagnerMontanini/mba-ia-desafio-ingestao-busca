@@ -1,0 +1,39 @@
+---
+description: Contexto global do projeto MBA — RAG CLI Python com LangChain + pgVector
+alwaysApply: true
+---
+
+# Contexto do Projeto
+
+**Nome**: Ingestão e Busca Semântica (MBA Eng. Software com IA)
+**Tipo**: CLI Python puro (RAG). **NÃO é Django** — ignore regras Django-específicas.
+**Stack**: Python 3.12 · LangChain 0.3 · langchain-postgres PGVector · PostgreSQL 17 + pgvector · OpenAI ou Gemini
+**Idioma**: pt-BR em mensagens, logs e documentação. Sem `gettext`, sem i18n.
+
+## Arquivos principais
+
+- `src/settings.py` — config + factories (única fonte de clientes)
+- `src/ingest.py` — PDF → chunks → embeddings → PGVector
+- `src/search.py` — `PROMPT_TEMPLATE` + `search_prompt()` LCEL
+- `src/chat.py` — REPL
+- `docker-compose.yml` — Postgres + bootstrap da extensão `vector`
+- `.env.example` / `.env` — configuração via env (12-Factor)
+
+## Skill especializada
+
+Para tarefas nos arquivos acima, consulte a skill `ingestao-busca-rag-dev` em
+`.cursor/skills/ingestao-busca-rag-dev/SKILL.md` — ela contém arquitetura,
+convenções, workflows passo-a-passo e scripts utilitários.
+
+## Invariantes não-negociáveis
+
+- **`.venv` obrigatório** — toda instalação e execução Python ocorre com o venv ativo do projeto. Nunca Python global.
+- Provider via env `PROVIDER=openai|gemini` — mesmo provider em ingest e search.
+- Driver da URL: `postgresql+psycopg://` (psycopg3). Nunca `psycopg2`.
+- `temperature=0` nos LLMs. `k=10` na busca. `chunk_size=1000`, `chunk_overlap=150`.
+- `PROMPT_TEMPLATE` em `src/search.py` é imutável.
+- Sem `print()` em `settings.py`/`ingest.py`/`search.py` — use `logging`.
+
+## Commits
+
+Conventional Commits em pt-BR. Ex.: `feat(ingest): implementa pipeline idempotente`.

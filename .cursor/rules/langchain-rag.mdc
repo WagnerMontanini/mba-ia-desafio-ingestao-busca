@@ -1,0 +1,89 @@
+---
+description: Invariantes LangChain/pgVector para ingest, search e chat
+globs: src/**/*.py
+alwaysApply: false
+---
+
+# Invariantes LangChain + pgVector
+
+## Imports corretos (APIs depreciadas quebram silenciosamente)
+
+```python
+# ✅ GOOD
+from langchain_postgres import PGVector
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+# ❌ BAD — depreciados
+from langchain.vectorstores import PGVector
+from langchain_community.vectorstores.pgvector import PGVector
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+```
+
+## Criação de clientes
+
+- **Única porta** de criação: factories em `src/settings.py`.
+- Scripts chamam `get_embeddings()`, `get_llm()`, `build_vector_store()`.
+- Não instancie `OpenAIEmbeddings`, `ChatOpenAI` ou `PGVector` fora de `settings.py`.
+
+```python
+# ❌ BAD — dentro de ingest.py / search.py
+store = PGVector(embeddings=OpenAIEmbeddings(), ...)
+
+# ✅ GOOD
+from settings import build_vector_store
+store = build_vector_store()
+```
+
+## Parâmetros fixos
+
+| Onde | Valor | Regra |
+|---|---|---|
+| `RecursiveCharacterTextSplitter` | `chunk_size=1000, chunk_overlap=150, add_start_index=True` | Não alterar |
+| `similarity_search_with_score` | `k=10` (use `TOP_K`) | Não alterar |
+| `ChatOpenAI` | `model="gpt-5-nano", temperature=0` | Fixo pelo enunciado |
+| `ChatGoogleGenerativeAI` | `model="gemini-2.5-flash-lite", temperature=0` | Fixo pelo enunciado |
+| `PGVector` | `use_jsonb=True` | Sempre |
+| `PROMPT_TEMPLATE` | exato do enunciado | **Imutável** |
+
+## Ingestão idempotente (src/ingest.py)
+
+Obrigatório passar `ids=` em `add_documents`. IDs UUIDv5 determinísticos:
+
+```python
+import uuid
+NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+chunk_id = str(uuid.uuid5(NAMESPACE, f"{source}|{page}|{start_index}"))
+```
+
+Sem `ids` → duplicatas a cada re-ingest. Metadata do chunk: manter apenas `{source, page, start_index}`.
+
+## Busca (src/search.py)
+
+`search_prompt()` retorna **callable** `ask(question) -> str`, não a chain crua:
+
+```python
+def search_prompt():
+    store = build_vector_store()
+    chain = PromptTemplate(...) | get_llm() | StrOutputParser()
+    def ask(q: str) -> str:
+        docs = store.similarity_search_with_score(q, k=TOP_K)
+        contexto = "\n\n".join(d.page_content.strip() for d, _ in docs)
+        return chain.invoke({"contexto": contexto, "pergunta": q}).strip()
+    return ask
+```
+
+Construir `store`, `prompt`, `chain` uma única vez — **fora** do closure `ask`.
+
+## Provider e dimensão
+
+OpenAI `text-embedding-3-small` = 1536d. Gemini `gemini-embedding-2-preview` = 3072d por padrão (configurável via `output_dimensionality`).
+**Incompatíveis** no mesmo índice. Trocar provider exige:
+
+```powershell
+python .cursor/skills/ingestao-busca-rag-dev/scripts/reset_collection.py
+```
+
+Ou usar `PG_VECTOR_COLLECTION_NAME` diferente por provider.
