@@ -1,0 +1,82 @@
+# =============================================================================
+# pre-commit — hooks locais executados antes de cada commit.
+#
+# Instalação (uma vez, após `pip install -r requirements-dev.txt`):
+#   pre-commit install --install-hooks
+#   pre-commit install --hook-type commit-msg
+#
+# Rodar em todos os arquivos:
+#   pre-commit run --all-files
+#
+# Atualizar versões dos hooks (revisar antes de commitar):
+#   pre-commit autoupdate
+# =============================================================================
+
+default_language_version:
+  python: python3.12
+
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
+# Pastas que nunca devem ser varridas.
+exclude: |
+  (?x)^(
+      \.venv/.*|
+      venv/.*|
+      \.cursor/skills/.*/__pycache__/.*|
+      .*\.pdf|
+      .*\.mo
+  )$
+
+repos:
+  # ---------------------------------------------------------------------------
+  # Higiene básica de arquivos (whitespace, EOL, YAML/TOML, grandes, etc.).
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=5120]  # 5 MB — PDFs médios entram, binários gigantes não.
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: debug-statements
+
+  # ---------------------------------------------------------------------------
+  # Ruff — lint (com --fix) + format. Substitui Black, isort e Flake8.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.8
+    hooks:
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # ---------------------------------------------------------------------------
+  # Commitizen — valida a mensagem de commit no padrão Conventional Commits.
+  # Roda apenas no stage commit-msg.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.1.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # ---------------------------------------------------------------------------
+  # gitleaks — detecta segredos (API keys, tokens) antes de irem para o git.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks

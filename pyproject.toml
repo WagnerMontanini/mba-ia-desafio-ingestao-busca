@@ -1,0 +1,133 @@
+# =============================================================================
+# pyproject.toml — configuração unificada de ferramentas de qualidade.
+#
+# Este projeto é um CLI Python (não é um pacote distribuído), por isso NÃO
+# declaramos [project] nem [build-system]. A instalação de dependências de
+# runtime continua sendo feita via `pip install -r requirements.txt`.
+#
+# Este arquivo concentra apenas configuração de ferramentas (Ruff, mypy,
+# pytest, commitizen) para garantir um único ponto de verdade.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Ruff — linter + formatter (substitui Black, isort, Flake8 e pyupgrade).
+# Documentação: https://docs.astral.sh/ruff/
+# -----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src"]
+extend-exclude = [
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "build",
+    "dist",
+    ".cursor",
+]
+
+[tool.ruff.lint]
+# Conjunto curado de regras. Expandir com cautela (um grupo por PR).
+select = [
+    "E",    # pycodestyle — errors
+    "W",    # pycodestyle — warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "N",    # pep8-naming
+    "S",    # flake8-bandit (segurança)
+    "RUF",  # regras específicas do Ruff
+    "PL",   # Pylint
+    "PTH",  # flake8-use-pathlib
+    "T20",  # flake8-print (bloqueia print() fora do CLI)
+    "TRY",  # tryceratops (boas práticas de except)
+    "RET",  # flake8-return
+]
+ignore = [
+    "E501",    # comprimento de linha — delegado ao formatter
+    "PLR0913", # muitos argumentos (comum em factories LangChain)
+    "TRY003",  # mensagens longas em Exception (útil para erros pt-BR)
+    "TRY401",  # logger.exception("msg: %s", exc) é intencional para pt-BR legível
+]
+
+[tool.ruff.lint.per-file-ignores]
+# print() é a UX correta no REPL e no prompt interativo de provider.
+"src/chat.py" = ["T20"]
+"src/cli_utils.py" = ["T20"]
+# ingest.py usa print() apenas no bloco `if __name__ == "__main__":`
+# para sinalizar sucesso/cancelamento do script CLI (UX do operador).
+"src/ingest.py" = ["T20"]
+# settings.py: override via `global _PROVIDER_OVERRIDE` é padrão intencional
+# do factory — documentado em docstring e único ponto de mutação.
+"src/settings.py" = ["PLW0603"]
+# Scripts utilitários da skill: relaxar regras de segurança/print.
+".cursor/skills/**/*.py" = ["T20", "S", "PL"]
+# Testes podem usar assert e valores mágicos à vontade.
+"tests/**/*" = ["S101", "PLR2004", "S105", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["settings", "cli_utils", "ingest", "search", "chat"]
+combine-as-imports = true
+force-single-line = false
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 80
+
+# -----------------------------------------------------------------------------
+# mypy — verificação estática de tipos.
+# Mantemos configuração leve: LangChain expõe muito Any e stubs parciais.
+# -----------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+show_error_codes = true
+pretty = true
+# LangChain/langchain-postgres não distribuem stubs completos.
+ignore_missing_imports = true
+# Não bloquear CI por `Any` implícito vindo de libs de terceiros.
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# -----------------------------------------------------------------------------
+# pytest — preparado para quando a suite de testes for criada.
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: testes que exigem Postgres + pgvector rodando",
+    "slow: testes lentos (chamadas reais a LLM/embeddings)",
+]
+
+# -----------------------------------------------------------------------------
+# commitizen — padroniza mensagens no formato Conventional Commits (pt-BR).
+# -----------------------------------------------------------------------------
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "semver"
+version = "0.1.0"
+update_changelog_on_bump = true

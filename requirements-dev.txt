@@ -1,0 +1,23 @@
+# Dependências de desenvolvimento — NÃO instalar em produção.
+#
+# Uso (com .venv ativo):
+#   pip install -r requirements-dev.txt
+#
+# As versões estão pinadas; atualize com PR dedicado e `pre-commit autoupdate`.
+-r requirements.txt
+
+# Lint + formatter (ver pyproject.toml [tool.ruff])
+ruff==0.15.8
+
+# Tipagem estática
+mypy==1.13.0
+
+# Orquestração de hooks de pre-commit
+pre-commit==4.0.1
+
+# Testes
+pytest==8.3.4
+pytest-cov==6.0.0
+
+# Mensagens de commit no padrão Conventional Commits (pt-BR)
+commitizen==4.1.0
