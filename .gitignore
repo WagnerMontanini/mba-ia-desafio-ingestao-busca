@@ -1,3 +1,37 @@
+# Segredos e ambiente
 .env
-/venv
-__pycache__
+.env.*
+!.env.example
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Bytecode Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches de ferramentas de qualidade
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Build / pacote (caso o projeto passe a ser distribuído)
+build/
+dist/
+*.egg-info/
+*.egg
+
+# IDE / SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+docs/skill/Prompt_Dev.md
